@@ -7,12 +7,29 @@ int downShiftPin = 14;
 int upShiftPin = 15;
 int DRSPin = 16;
 
+// CAN Status LED
+int led = 13;
+
+// NEOPIXELS
+int pixelPin = 10;
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(16, pixelPin, NEO_GRB + NEO_KHZ800);
+
+// Neopixel Parameters
+int wakeUp = 1500;
+int shiftRpm = 9000;
+int redline = 11250;
+int brightness = 255; // 0 to 255
+int delayVal = 35;    // set wakeup sequence speed
+
 // Time Keeping Vars (Software Debounce)
 int debounceDelay = 50; // Millis to delay
 unsigned long DownShiftMillis = 0;
 unsigned long upShiftMillis = 0;
 unsigned long DRSPressedMillis = 0;
 unsigned long DRSReleasedMillis = 0;
+
+// CAN Frame Data
+int rpm = 0;
 
 // Necessary CAN frames
 CAN_message_t inMsg;
@@ -29,12 +46,7 @@ void upShift();
 void downShift();
 void DRSPRessed();
 void DRSReleased();
-
-// // interrupt set these to true and then command is handled in the main loop
-// bool shouldUpShift = false;
-// bool shouldDownShift = false;
-// bool DRSPressed = false;
-// bool DRSReleased = false;
+void setLights(int rpm);
 
 void setup() {
   Serial.begin(9600);
@@ -44,6 +56,10 @@ void setup() {
   pinMode(downShiftPin, INPUT_PULLUP);
   pinMode(upShiftPin, INPUT_PULLUP);
   pinMode(DRSPin, INPUT_PULLUP);
+
+  // LED setup
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH);
 
   // Attach Interrupts
   attachInterrupt(digitalPinToInterrupt(downShiftPin), downShift, FALLING);
@@ -74,9 +90,28 @@ void setup() {
   //----- FRAME DEFINITIONS -----
   upShiftMsg.buf[0] = 10;
   downShiftMsg.buf[0] = 11;
+
+  //----- NEOPIXEL SETUP -----
+  strip.begin();
+  for (int i = 0; i < 16; i++) {
+    strip.setPixelColor(i, 255, 0, 255);
+  }
+  strip.show();
 }
 
-void loop() {}
+void loop() {
+  if (Can0.available()) {
+    digitalWrite(led, !digitalRead(led));
+    Can0.read(inMsg);
+
+    if (inMsg.id == 218099784) { // This frame carries RPM and TPS
+      int lowByte = inMsg.buf[0];
+      int highByte = inMsg.buf[1];
+      rpm = ((highByte * 256) + lowByte);
+      setLights(rpm);
+    }
+  }
+}
 
 // ----- CAN FRAME SENDING ISR's -----
 // REMOVE ALL SERIAL PRINTS ONCE INSTALLED!
@@ -113,5 +148,55 @@ void DRSReleased() {
     if (Can0.write(DRSReleasedMsg)) {
       Serial.println("DRS Release successful");
     }
+  }
+}
+
+//----- NEOPIXEL FUNCTIONS -----
+
+void setLights(int rpm) {
+
+  if (rpm < shiftRpm) { // ----- NORMAL REVS -----
+
+    strip.clear();
+
+    int numLEDs = strip.numPixels();
+    float rpmPerLED =
+        ((redline - wakeUp) / numLEDs); // calculates how many rpm per led
+    int ledsToLight = ceil(rpm / rpmPerLED);
+
+    for (int i = 0; i <= ledsToLight; i++) {
+
+      strip.setPixelColor(i, 0, 255, 0);
+    }
+
+    strip.show();
+  }
+
+  if ((rpm > shiftRpm) && (rpm < redline)) { // ----- SHIFT POINT-----
+    strip.clear();
+
+    int numLEDs = strip.numPixels();
+    float rpmPerLED =
+        ((redline - wakeUp) / numLEDs); // calculates how many rpm per led
+    int ledsToLight = ceil(rpm / rpmPerLED);
+
+    for (int i = 0; i <= ledsToLight; i++) {
+
+      strip.setPixelColor(i, 255, 255, 0); // yellow
+    }
+
+    strip.show();
+  }
+
+  if (rpm > redline) { //----- REDLINE -----
+    for (unsigned int i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, 255, 0, 0);
+    }
+
+    strip.show();
+    delay(20);
+    strip.clear();
+    strip.show();
+    delay(20);
   }
 }
