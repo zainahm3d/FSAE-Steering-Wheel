@@ -3,6 +3,9 @@
 #include <FlexCAN.h>
 
 // Button Inputs
+// Be sure to debounce with a cap, otherwise interrupt will trigger on button
+// release bounces. 2.2uF works.
+
 int downShiftPin = 14;
 int upShiftPin = 15;
 int DRSPin = 16;
@@ -21,13 +24,6 @@ int redline = 11250;
 int brightness = 255; // 0 to 255
 int delayVal = 35;    // set wakeup sequence speed
 
-// Time Keeping Vars (Software Debounce)
-int debounceDelay = 50; // Millis to delay
-unsigned long DownShiftMillis = 0;
-unsigned long upShiftMillis = 0;
-unsigned long DRSPressedMillis = 0;
-unsigned long DRSReleasedMillis = 0;
-
 // CAN Frame Data
 int rpm = 0;
 
@@ -44,8 +40,9 @@ CAN_message_t CANFrames[5] = {inMsg, downShiftMsg, upShiftMsg, DRSPressedMsg,
 // Function Prototypes
 void upShift();
 void downShift();
-void DRSPRessed();
+void DRSPressed();
 void DRSReleased();
+void DRSChanged();
 void setLights(int rpm);
 
 void setup() {
@@ -64,8 +61,7 @@ void setup() {
   // Attach Interrupts
   attachInterrupt(digitalPinToInterrupt(downShiftPin), downShift, FALLING);
   attachInterrupt(digitalPinToInterrupt(upShiftPin), upShift, FALLING);
-  attachInterrupt(digitalPinToInterrupt(DRSPin), DRSPRessed, FALLING);
-  attachInterrupt(digitalPinToInterrupt(DRSPin), DRSReleased, RISING);
+  attachInterrupt(digitalPinToInterrupt(DRSPin), DRSChanged, CHANGE);
 
   Can0.begin(250000);
 
@@ -116,38 +112,38 @@ void loop() {
 // ----- CAN FRAME SENDING ISR's -----
 // REMOVE ALL SERIAL PRINTS ONCE INSTALLED!
 void downShift() {
-  if (millis() - DownShiftMillis > debounceDelay) {
-    Serial.println("DownShift");
-    if (Can0.write(downShiftMsg)) {
-      Serial.println("DownShift successful");
-    }
+  Serial.println("DownShift");
+  if (Can0.write(downShiftMsg)) {
+    Serial.println("DownShift successful");
   }
 }
 
 void upShift() {
-  if (millis() - upShiftMillis > debounceDelay) {
-    Serial.println("UpShift");
-    if (Can0.write(upShiftMsg)) {
-      Serial.println("UpShift successful");
-    }
+  Serial.println("UpShift");
+  if (Can0.write(upShiftMsg)) {
+    Serial.println("UpShift successful");
   }
 }
 
-void DRSPRessed() {
-  if (millis() - DRSPressedMillis > debounceDelay) {
-    Serial.println("DRS Pressed");
-    if (Can0.write(DRSPressedMsg)) {
-      Serial.println("DRS Press successful");
-    }
+void DRSChanged() {
+  if (digitalRead(DRSPin) == 1) { // rising
+    DRSReleased();
+  } else { // falling
+    DRSPressed();
+  }
+}
+
+void DRSPressed() {
+  Serial.println("DRS Pressed");
+  if (Can0.write(DRSPressedMsg)) {
+    Serial.println("DRS Press successful");
   }
 }
 
 void DRSReleased() {
-  if (millis() - DRSReleasedMillis > debounceDelay) {
-    Serial.println("DRS Released");
-    if (Can0.write(DRSReleasedMsg)) {
-      Serial.println("DRS Release successful");
-    }
+  Serial.println("DRS Released");
+  if (Can0.write(DRSReleasedMsg)) {
+    Serial.println("DRS Release successful");
   }
 }
 
