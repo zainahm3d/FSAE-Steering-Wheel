@@ -34,9 +34,6 @@ CAN_message_t upShiftMsg;
 CAN_message_t DRSPressedMsg;
 CAN_message_t DRSReleasedMsg;
 
-CAN_message_t CANFrames[5] = {inMsg, downShiftMsg, upShiftMsg, DRSPressedMsg,
-                              DRSReleasedMsg};
-
 // Function Prototypes
 void upShift();
 void downShift();
@@ -44,6 +41,14 @@ void DRSPressed();
 void DRSReleased();
 void DRSChanged();
 void setLights(int rpm);
+void downTrig();
+void upTrig();
+
+volatile bool shouldUpShift = false;
+volatile bool shouldDownShift = false;
+
+volatile bool shouldEnableDRS = false;
+volatile bool shouldDisableDRS = false;
 
 void setup() {
   Serial.begin(9600);
@@ -59,8 +64,8 @@ void setup() {
   digitalWrite(13, HIGH);
 
   // Attach Interrupts
-  attachInterrupt(digitalPinToInterrupt(downShiftPin), downShift, FALLING);
-  attachInterrupt(digitalPinToInterrupt(upShiftPin), upShift, FALLING);
+  attachInterrupt(digitalPinToInterrupt(downShiftPin), downTrig, FALLING);
+  attachInterrupt(digitalPinToInterrupt(upShiftPin), upTrig, FALLING);
   attachInterrupt(digitalPinToInterrupt(DRSPin), DRSChanged, CHANGE);
 
   Can0.begin(250000);
@@ -72,18 +77,18 @@ void setup() {
     Can0.setFilter(allPassFilter, filterNum);
   }
 
-  // Set all CAN frames as extended
-  for (int i = 0; i < 5; i++) {
-    CANFrames[i].ext = true;
-    CANFrames[i].len = 8;
-
-    // Set all frame ID's to 0 except for the inMsg
-    if (i != 0) {
-      CANFrames[i].id = 0;
-    }
-  }
-
   //----- FRAME DEFINITIONS -----
+  inMsg.ext = true;
+  downShiftMsg.ext = true;
+  upShiftMsg.ext = true;
+  DRSPressedMsg.ext = true;
+  DRSReleasedMsg.ext = true;
+
+  downShiftMsg.len = 8;
+  upShiftMsg.len = 8;
+  DRSPressedMsg.len = 8;
+  DRSReleasedMsg.len = 8;
+
   upShiftMsg.buf[0] = 10;
   downShiftMsg.buf[0] = 11;
 
@@ -96,6 +101,30 @@ void setup() {
 }
 
 void loop() {
+  if (shouldUpShift == true) {
+    upShift();
+    delay(100);
+    shouldUpShift = false;
+  }
+
+  if (shouldDownShift == true) {
+    downShift();
+    delay(100);
+    shouldDownShift = false;
+  }
+
+  if (shouldDisableDRS == true) {
+    DRSReleased();
+    delay(100);
+    shouldDisableDRS = false;
+  }
+
+  if (shouldEnableDRS == true) {
+    DRSPressed();
+    delay(100);
+    shouldEnableDRS = false;
+  }
+
   if (Can0.available()) {
     digitalWrite(led, !digitalRead(led));
     Can0.read(inMsg);
@@ -111,6 +140,9 @@ void loop() {
 
 // ----- CAN FRAME SENDING ISR's -----
 // REMOVE ALL SERIAL PRINTS ONCE INSTALLED!
+void downTrig() { shouldDownShift = true; }
+void upTrig() { shouldUpShift = true; }
+
 void downShift() {
   Serial.println("DownShift");
   if (Can0.write(downShiftMsg)) {
@@ -127,9 +159,9 @@ void upShift() {
 
 void DRSChanged() {
   if (digitalRead(DRSPin) == 1) { // rising
-    DRSReleased();
+    shouldDisableDRS = true;
   } else { // falling
-    DRSPressed();
+    shouldEnableDRS = true;
   }
 }
 
