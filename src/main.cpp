@@ -6,9 +6,10 @@
 // Be sure to debounce with a cap, otherwise interrupt will trigger on button
 // release bounces. 2.2uF works.
 
-int downShiftPin = 14;
-int upShiftPin = 15;
-int DRSPin = 16;
+int downShiftPin = 14; // Left paddle (on rear)
+int upShiftPin = 15;   // Right paddle (on rear)
+int DRSPin = 16;       // Right front button
+int settingPin = 17;   // Left front button
 
 // CAN Status LED
 int led = 13;
@@ -43,9 +44,12 @@ void DRSChanged();
 void setLights(int rpm);
 void downTrig();
 void upTrig();
+void settingTrig();
+void changeSetting();
 
 volatile bool shouldUpShift = false;
 volatile bool shouldDownShift = false;
+volatile bool shouldChangeSetting = false;
 
 volatile bool shouldEnableDRS = false;
 volatile bool shouldDisableDRS = false;
@@ -58,6 +62,10 @@ void setup() {
   pinMode(downShiftPin, INPUT_PULLUP);
   pinMode(upShiftPin, INPUT_PULLUP);
   pinMode(DRSPin, INPUT_PULLUP);
+  pinMode(settingPin, INPUT_PULLUP);
+
+  // input is 3.3v
+  // other pin is commonground
 
   // LED setup
   pinMode(13, OUTPUT);
@@ -67,6 +75,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(downShiftPin), downTrig, FALLING);
   attachInterrupt(digitalPinToInterrupt(upShiftPin), upTrig, FALLING);
   attachInterrupt(digitalPinToInterrupt(DRSPin), DRSChanged, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(settingPin), settingTrig, FALLING);
 
   Can0.begin(250000);
 
@@ -84,13 +93,15 @@ void setup() {
   DRSPressedMsg.ext = true;
   DRSReleasedMsg.ext = true;
 
-  downShiftMsg.len = 8;
   upShiftMsg.len = 8;
+  downShiftMsg.len = 8;
   DRSPressedMsg.len = 8;
   DRSReleasedMsg.len = 8;
 
   upShiftMsg.buf[0] = 10;
   downShiftMsg.buf[0] = 11;
+  DRSPressedMsg.buf[0] = 12;
+  DRSReleasedMsg.buf[0] = 13;
 
   //----- NEOPIXEL SETUP -----
   strip.begin();
@@ -102,15 +113,33 @@ void setup() {
 
 void loop() {
   if (shouldUpShift == true) {
-    upShift();
-    delay(100);
+    delay(20);
+    if (digitalRead(upShiftPin) == LOW) {
+      shouldUpShift = false;
+      upShift();
+      delay(150);
+    }
     shouldUpShift = false;
   }
 
   if (shouldDownShift == true) {
-    downShift();
-    delay(100);
+    delay(20);
+    if (digitalRead(downShiftPin) == LOW) {
+      shouldDownShift = false;
+      downShift();
+      delay(150);
+    }
     shouldDownShift = false;
+  }
+
+  if (shouldChangeSetting == true) {
+    delay(20);
+    if (digitalRead(settingPin) == LOW) {
+      shouldChangeSetting = false;
+      changeSetting();
+      delay(150);
+    }
+    shouldChangeSetting = false;
   }
 
   if (shouldDisableDRS == true) {
@@ -142,6 +171,7 @@ void loop() {
 // REMOVE ALL SERIAL PRINTS ONCE INSTALLED!
 void downTrig() { shouldDownShift = true; }
 void upTrig() { shouldUpShift = true; }
+void settingTrig() { shouldChangeSetting = true; }
 
 void downShift() {
   Serial.println("DownShift");
@@ -159,9 +189,17 @@ void upShift() {
 
 void DRSChanged() {
   if (digitalRead(DRSPin) == 1) { // rising
-    shouldDisableDRS = true;
+    delay(20);
+    if (digitalRead(DRSPin) == 1) { // rising
+      shouldDisableDRS = true;
+    }
   } else { // falling
-    shouldEnableDRS = true;
+    if (digitalRead(DRSPin) == 0) {
+      delay(20);
+      if (digitalRead(DRSPin) == 0) {
+        shouldEnableDRS = true;
+      }
+    }
   }
 }
 
@@ -226,5 +264,14 @@ void setLights(int rpm) {
     strip.clear();
     strip.show();
     delay(20);
+  }
+}
+
+void changeSetting() {
+  Serial.println("Brightness Setting Changed");
+  if (strip.getBrightness() == 255) {
+    strip.setBrightness(30); // Night mode
+  } else {
+    strip.setBrightness(255);
   }
 }
