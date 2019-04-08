@@ -17,8 +17,6 @@ int led = 13;
 // NEOPIXELS
 int pixelPin = 10;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(16, pixelPin, NEO_GRB + NEO_KHZ800);
-
-// Neopixel Parameters
 int wakeUp = 1500;
 int shiftRpm = 9000;
 int redline = 11250;
@@ -216,6 +214,12 @@ void disableDRS() {
 //----- NEOPIXEL FUNCTIONS -----
 
 void setLights(int rpm) {
+
+  if (rpm == 0) {
+    strip.clear();
+    strip.setPixelColor(0, 0, 255, 0);
+    strip.setPixelColor(15, 0, 255, 0);
+  }
 
   if (rpm < shiftRpm) { // ----- NORMAL REVS -----
 
