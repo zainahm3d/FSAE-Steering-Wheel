@@ -102,10 +102,10 @@ void setup() {
   enableDRSMsg.len = 8;
   disableDRSMsg.len = 8;
 
-  upShiftMsg.buf[0] = 10;
-  downShiftMsg.buf[0] = 11;
-  enableDRSMsg.buf[0] = 12;
-  disableDRSMsg.buf[0] = 13;
+  upShiftMsg.buf[0] = 10;    // 0x0A
+  downShiftMsg.buf[0] = 11;  // 0x0B
+  enableDRSMsg.buf[0] = 12;  // 0x0C
+  disableDRSMsg.buf[0] = 13; // 0x0D
 
   //----- NEOPIXEL SETUP -----
   strip.begin();
