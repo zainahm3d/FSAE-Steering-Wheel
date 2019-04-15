@@ -110,7 +110,7 @@ void setup() {
   //----- NEOPIXEL SETUP -----
   strip.begin();
   for (int i = 0; i < 16; i++) {
-    strip.setPixelColor(i, 255, 0, 255);
+    strip.setPixelColor(i, 0, 255, 255);
   }
   strip.show();
 }
@@ -256,7 +256,7 @@ void setLights(int rpm) {
 
   if (rpm > redline) { //----- REDLINE -----
     for (unsigned int i = 0; i < strip.numPixels(); i++) {
-      strip.setPixelColor(i, 255, 0, 0);
+      strip.setPixelColor(i, 255, 0, 255);
     }
 
     strip.show();
@@ -270,9 +270,11 @@ void setLights(int rpm) {
 void changeSetting() {
   Serial.println("Brightness Setting Changed");
   if (strip.getBrightness() == 255) {
-    strip.setBrightness(30); // Night mode
+    strip.setBrightness(25); // Night mode
+    strip.show();
   } else {
     strip.setBrightness(255);
+    strip.show();
   }
 }
 
