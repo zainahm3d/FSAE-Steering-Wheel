@@ -196,7 +196,6 @@ void loop() {
   if ((millis() - lastEcuMillis) > 500) {
     ecuOn = false;
     EngRunning = false;
-    Serial.println("ECU Offline");
   }
 
   if (ecuOn == false) {
