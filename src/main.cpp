@@ -6,10 +6,17 @@
 // Be sure to debounce with a cap, otherwise interrupt will trigger on button
 // release bounces. 2.2uF works.
 
-int downShiftPin = 14; // Left paddle (on rear)
-int upShiftPin = 15;   // Right paddle (on rear)
-int DRSPin = 16;       // Right front button
-int settingPin = 17;   // Left front button
+// int downShiftPin = 14; // Left paddle (on rear)
+// int upShiftPin = 15;   // Right paddle (on rear)
+// int DRSPin = 16;       // Right front button
+// int settingPin = 17;   // Left front button
+
+// ---------- TEMPORARY ----------
+int downShiftPin = 17; // Left paddle (on rear)
+int upShiftPin = 16;   // Right paddle (on rear)
+int DRSPin = 14;       // Right front button
+int settingPin = 15;   // Left front button
+// ---------- /TEMPORARY ----------
 
 // CAN Status LED
 int led = 13;
@@ -189,7 +196,34 @@ void loop() {
       if (rpm > 500) {
         EngRunning = true;
       }
-      setLights(rpm);
+      if (rpm > 4000) {
+        setLights(rpm);
+      }
+    }
+
+    if (inMsg.id == 6) {
+      if (rpm < 4000) { // Show info on tach
+        strip.clear();
+
+        if (ecuOn == true) {
+          strip.setPixelColor(1, 0, 255, 0);
+          strip.setPixelColor(14, 0, 255, 0);
+        } else {
+          strip.setPixelColor(1, 255, 255, 255);
+          strip.setPixelColor(14, 255, 255, 255);
+        }
+
+        if (inMsg.buf[0] == 0) { // Neutral
+          for (int i = 6; i < 10; i++) {
+            strip.setPixelColor(i, 0, 255, 0);
+          }
+        } else if (inMsg.buf[0] == 1) { // In gear
+          for (int i = 6; i < 10; i++) {
+            strip.setPixelColor(i, 255, 255, 255);
+          }
+        }
+        strip.show();
+      }
     }
   }
 
@@ -199,6 +233,7 @@ void loop() {
   }
 
   if (ecuOn == false) {
+    rpm = 0;
     strip.clear();
     strip.setPixelColor(14, 255, 255, 255);
     strip.setPixelColor(1, 255, 255, 255);
