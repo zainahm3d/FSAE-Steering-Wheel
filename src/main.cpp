@@ -3,20 +3,10 @@
 #include <FlexCAN.h>
 
 // Button Inputs
-// Be sure to debounce with a cap, otherwise interrupt will trigger on button
-// release bounces. 2.2uF works.
-
-// int downShiftPin = 14; // Left paddle (on rear)
-// int upShiftPin = 15;   // Right paddle (on rear)
-// int DRSPin = 16;       // Right front button
-// int settingPin = 17;   // Left front button
-
-// ---------- TEMPORARY ----------
-int downShiftPin = 17; // Left paddle (on rear)
-int upShiftPin = 16;   // Right paddle (on rear)
-int DRSPin = 14;       // Right front button
-int settingPin = 15;   // Left front button
-// ---------- /TEMPORARY ----------
+int downShiftPin = 14; // Left paddle (on rear)
+int upShiftPin = 15;   // Right paddle (on rear)
+int DRSPin = 16;       // Right front button
+int settingPin = 17;   // Left front button
 
 // CAN Status LED
 int led = 13;
@@ -41,6 +31,7 @@ CAN_message_t inMsg;
 
 CAN_message_t downShiftMsg;
 CAN_message_t upShiftMsg;
+CAN_message_t halfShiftMsg;
 
 CAN_message_t enableDRSMsg;
 CAN_message_t disableDRSMsg;
@@ -48,6 +39,7 @@ CAN_message_t disableDRSMsg;
 // Function Prototypes
 void upShift();
 void downShift();
+void halfShift();
 
 void enableDRS();
 void disableDRS();
@@ -104,6 +96,7 @@ void setup() {
   inMsg.ext = true;
   downShiftMsg.ext = true;
   upShiftMsg.ext = true;
+  halfShiftMsg.ext = true;
   enableDRSMsg.ext = true;
   disableDRSMsg.ext = true;
 
@@ -111,16 +104,19 @@ void setup() {
   downShiftMsg.id = 0;
   enableDRSMsg.id = 0;
   disableDRSMsg.id = 0;
+  halfShiftMsg.id = 0;
 
   upShiftMsg.len = 8;
   downShiftMsg.len = 8;
   enableDRSMsg.len = 8;
   disableDRSMsg.len = 8;
+  halfShiftMsg.len = 8;
 
   upShiftMsg.buf[0] = 10;    // 0x0A
   downShiftMsg.buf[0] = 11;  // 0x0B
   enableDRSMsg.buf[0] = 12;  // 0x0C
   disableDRSMsg.buf[0] = 13; // 0x0D
+  halfShiftMsg.buf[0] = 14;  // 0x0E
 
   //----- NEOPIXEL SETUP -----
   strip.begin();
@@ -159,9 +155,25 @@ void loop() {
   }
 
   if (shouldChangeSetting == true) {
+    // if (checkPin(settingPin, 0)) {
+    //   changeSetting();
+    //   delay(150);
+    // }
+
+    bool didBreak = false;
+
     if (checkPin(settingPin, 0)) {
-      changeSetting();
-      delay(150);
+      for (int i = 0; i < 20; i++) {
+        if (checkPin(settingPin, 0) == false) {
+          changeSetting();
+          didBreak = true;
+          break;
+        }
+      }
+
+      if (didBreak == false) {
+        halfShift();
+      }
     }
     shouldChangeSetting = false;
   }
@@ -258,6 +270,13 @@ void upShift() {
   Serial.println("UpShift");
   if (Can0.write(upShiftMsg)) {
     Serial.println("UpShift successful");
+  }
+}
+
+void halfShift() {
+  Serial.println("HalfShift");
+  if (Can0.write(halfShiftMsg)) {
+    Serial.println("HalfShift successful");
   }
 }
 
